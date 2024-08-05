@@ -89,6 +89,7 @@ class StarCraft2Env(MultiAgentEnv):
         obs_timestep_number=False,
         obs_own_pos=False,
         obs_starcraft=True,
+        sight_range_ratio=1,
         conic_fov=False,
         num_fov_actions=12,
         state_last_action=True,
@@ -237,6 +238,7 @@ class StarCraft2Env(MultiAgentEnv):
             self.obs_own_health = True
         self.n_obs_pathing = 8
         self.n_obs_height = 9
+        self.sight_range_ratio = sight_range_ratio
 
         # Rewards args
         self.reward_sparse = reward_sparse
@@ -1090,7 +1092,7 @@ class StarCraft2Env(MultiAgentEnv):
                 self.medivac_id: 11,
             }
             unit = self.agents[agent_id]
-            return sight_range_map[unit.unit_type]
+            return sight_range_map[unit.unit_type] * self.sight_range_ratio
         else:
             return 9
 
