@@ -89,6 +89,7 @@ class StarCraft2Env(MultiAgentEnv):
         obs_timestep_number=False,
         obs_own_pos=False,
         obs_starcraft=True,
+        random_sight_range=False,
         sight_range_ratio=1,
         conic_fov=False,
         num_fov_actions=12,
@@ -239,6 +240,7 @@ class StarCraft2Env(MultiAgentEnv):
         self.n_obs_pathing = 8
         self.n_obs_height = 9
         self.sight_range_ratio = sight_range_ratio
+        self.random_sight_range = random_sight_range
 
         # Rewards args
         self.reward_sparse = reward_sparse
@@ -522,6 +524,12 @@ class StarCraft2Env(MultiAgentEnv):
         """Reset the environment. Required after each full episode.
         Returns initial observations and states.
         """
+        if self.random_sight_range:
+            if np.random.uniform() < 0.5:
+                self.sight_range_ratio = np.random.uniform(0.1, 1)
+            else:
+                self.sight_range_ratio = np.random.uniform(1, 5.1)
+            # print(f"Sight range ratio: {self.sight_range_ratio}")
         self._episode_steps = 0
         self.episode_config = episode_config
         if self._episode_count == 0:
@@ -692,12 +700,14 @@ class StarCraft2Env(MultiAgentEnv):
                 self.win_counted = True
                 info["battle_won"] = True
                 if not self.reward_sparse:
+                    # print(f"battle won: base reward {reward}, reward_win {self.reward_win}")
                     reward += self.reward_win
                 else:
                     reward = 1
             elif game_end_code == -1 and not self.defeat_counted:
                 self.defeat_counted = True
                 if not self.reward_sparse:
+                    # print(f"battle lost: base reward {reward}, reward_defeat {self.reward_defeat}")
                     reward += self.reward_defeat
                 else:
                     reward = -1
@@ -718,6 +728,8 @@ class StarCraft2Env(MultiAgentEnv):
 
         if self.reward_scale:
             reward /= self.max_reward / self.reward_scale_rate
+            # if terminated:  
+            #     print(f"reward scaled: {reward}, 200 / {self.max_reward} * {self.reward_scale_rate} = {200 / self.max_reward * self.reward_scale_rate}")
 
         self.reward = reward
 
@@ -1495,6 +1507,9 @@ class StarCraft2Env(MultiAgentEnv):
         enemy_feats_dim = self.get_obs_enemy_feats_size()
         ally_feats_dim = self.get_obs_ally_feats_size()
         own_feats_dim = self.get_obs_own_feats_size()
+        # print(f"move_feats_dim: {move_feats_dim}, enemy_feats_dim: {enemy_feats_dim}, ally_feats_dim: {ally_feats_dim}, own_feats_dim: {own_feats_dim}")
+        # print(f"unit type: {unit.unit_type}, {self.get_unit_type_id(unit, True)}, sight_range: {self.unit_sight_range(agent_id)}")
+        # breakpoint()
 
         move_feats = np.zeros(move_feats_dim, dtype=np.float32)
         enemy_feats = np.zeros(enemy_feats_dim, dtype=np.float32)
@@ -1554,6 +1569,12 @@ class StarCraft2Env(MultiAgentEnv):
                     enemy_feats[e_id, 0] = true_avail_actions[
                         self.n_actions_no_attack + e_id
                     ]  # available
+                    # enemy_feats[e_id, 0] = 0 if unit.unit_type == self.medivac_id else enemy_feats[e_id, 0]
+                    # if enemy_feats[e_id, 0] == 0 and dist < self.unit_shoot_range(agent_id) and not np.all(true_avail_actions[self.n_actions_no_attack:]==0):
+                    #     print(unit.unit_type == self.medivac_id)
+                    #     print(f"a_id {agent_id}, e_id {e_id}, attackable: {true_avail_actions[self.n_actions_no_attack + e_id]}, shoot_range {self.unit_shoot_range(agent_id)}, dist {dist}, sight_range {sight_range}")
+                    #     breakpoint()
+                    #     print(self.get_true_avail_agent_actions(agent_id))
                     enemy_feats[e_id, 1] = dist / sight_range  # distance
                     enemy_feats[e_id, 2] = (
                         e_x - x
@@ -1810,6 +1831,8 @@ class StarCraft2Env(MultiAgentEnv):
         # number of features equals the number of attribute names
         nf_al = self.get_ally_num_attributes()
         nf_en = self.get_enemy_num_attributes()
+        # print(f"nf_al: {nf_al}, nf_en: {nf_en}")
+        # breakpoint()
 
         ally_state = np.zeros((self.n_agents, nf_al))
         enemy_state = np.zeros((self.n_enemies, nf_en))
@@ -1897,7 +1920,7 @@ class StarCraft2Env(MultiAgentEnv):
             state["last_action"] = self.last_action
         if self.state_timestep_number:
             state["timestep"] = self._episode_steps / self.episode_limit
-
+        
         return state
 
     def get_obs_enemy_feats_size(self):
@@ -2636,6 +2659,7 @@ class StarCraft2Env(MultiAgentEnv):
         return stats
 
     def get_env_info(self):
+        # breakpoint()
         env_info = super().get_env_info()
         env_info["agent_features"] = (
             self.ally_state_attr_names + self.capability_attr_names
